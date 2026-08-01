@@ -62,7 +62,7 @@ from keyboards import (
     admin_panel_menu,
 )
 from utils import is_duplicate_action, now_tehran_naive, parse_int_in_range
-from handlers.admin import _admin_perm, _log_fulfilled_order
+from handlers.admin import _admin_perm, _is_admin, _log_fulfilled_order
 
 router = Router(name="marzban_admin")
 
@@ -543,7 +543,12 @@ async def marzban_map_plan_set(callback: types.CallbackQuery, state: FSMContext)
 # ---------------------------------------------------------------------------
 @router.callback_query(F.data.startswith("marzbansend|"))
 async def marzban_send_service(callback: types.CallbackQuery, state: FSMContext):
-    if not _admin_perm(callback.from_user.id, "vpn_panel"):
+    # 🐛 فیکس: این دکمه دقیقاً کنار دکمه‌ی دستی «🚀 ارسال کانفیگ VIP (QR) — دستی» (sendvip_)
+    # در همان پیام نمایش داده می‌شود و آن دکمه فقط با _is_admin چک می‌شد؛ قبلاً اینجا مجوز
+    # جداگانه‌ای "vpn_panel" چک می‌شد و برای ادمین فرعی‌ای که فقط مجوز پیگیری سفارشات (requests)
+    # داشت و مجوز جداگانه‌ی تنظیمات پنل VPN را نداشت، این دکمه بی‌پاسخ می‌ماند. حالا
+    # مثل همان دکمه‌ی دستی، فقط _is_admin (ادمین اصلی یا هر ادمین فرعی) چک می‌شود.
+    if not _is_admin(callback.from_user.id):
         await callback.answer("⛔ دسترسی ندارید.", show_alert=True)
         return
     if is_duplicate_action(f"marzbansend_{callback.data}"):
@@ -602,7 +607,14 @@ async def marzban_send_service(callback: types.CallbackQuery, state: FSMContext)
 
 @router.callback_query(F.data.startswith("marzbancustom_"))
 async def marzban_custom_start(callback: types.CallbackQuery, state: FSMContext):
-    if not _admin_perm(callback.from_user.id, "vpn_panel"):
+    # 🐛 فیکس: همین باگ که در marzban_send_service بالا توضیح داده شد — دکمه‌ی «🚀 ساخت خودکار از پنل فعال» کنار دکمه‌ی دستی «📤
+    # شروع ارسال کانفیگ — دستی» (sendcustomorder_) نمایش داده می‌شود و هر دو برای همان ادمین‌های فرعی
+    # مسئول پیگیری سفارشات (مجوز requests) فرستاده می‌شود. قبلاً این دکمه مجوز "vpn_panel" می‌خواست
+    # (جداگانه از مجوز دکمه‌ی دستی کنارش)، برای همین برای ادمین فرعیای که فقط مجوز پیگیری
+    # سفارشات داشت، این دکمه کاملاً بی‌پاسخ می‌ماند (بدون هیچ پیام/پاسخی به کاربر)؛ از نظر کاربر
+    # دقیقاً همان «این دکمه کار نمی‌کند» بود. حالا مثل دکمه‌ی دستی، فقط _is_admin چک می‌شود.
+    if not _is_admin(callback.from_user.id):
+        await callback.answer("⛔ دسترسی ندارید.", show_alert=True)
         return
     order_id = int(callback.data.replace("marzbancustom_", ""))
     order = db.get_custom_order(order_id)
@@ -626,7 +638,9 @@ async def marzban_custom_start(callback: types.CallbackQuery, state: FSMContext)
 
 @router.callback_query(F.data.startswith("marzbancustompick_"))
 async def marzban_custom_pick(callback: types.CallbackQuery, state: FSMContext):
-    if not _admin_perm(callback.from_user.id, "vpn_panel"):
+    # 🐛 فیکس: مطابق marzban_custom_start بالا — فقط _is_admin چک می‌شود.
+    if not _is_admin(callback.from_user.id):
+        await callback.answer("⛔ دسترسی ندارید.", show_alert=True)
         return
     idx = int(callback.data.replace("marzbancustompick_", ""))
     data_state = await state.get_data()
