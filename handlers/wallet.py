@@ -147,13 +147,27 @@ async def _offer_charge_payment_method(target, amount: int, state: FSMContext):
             await show_menu_with_sticker(target.bot, target.chat.id, "walletcharge_method", text, reply_markup=markup)
         return
 
-    await state.update_data(amount=amount)
+    # 🐛 فیکس: این مسیر (مبلغ‌های کوچک یا وقتی درگاه آنلاین خاموش است) قبلاً هیچ‌وقت
+    # فاکتور واقعی نمی‌ساخت و wallet_card_invoice_id را در state ذخیره نمی‌کرد؛ در نتیجه
+    # در receive_receipt همیشه wallet_card_invoice_id خالی بود و کاربر به‌جای تأیید رسید،
+    # همیشه پیام «مهلت ۳۰ دقیقه‌ای... منقضی شد» را می‌دید، حتی اگر همان لحظه رسید را می‌فرستاد.
+    invoicing_user = _get_user_row(target.from_user.id)
+    invoice = db.create_invoice(
+        user_id=invoicing_user["id"] if invoicing_user else None,
+        telegram_id=str(target.from_user.id),
+        kind="wallet_card",
+        label="شارژ کیف پول",
+        price=amount,
+    )
+    deadline_str = format_deadline_time(invoice["expires_at"])
+    await state.update_data(amount=amount, wallet_card_invoice_id=invoice["id"])
     await state.set_state(UserStates.waiting_charge_receipt)
     text = (
         f"💳 مبلغ: {amount:,} تومان\n\n"
         f"💳 شماره کارت:\n{bot_info.get('card_number')}\n\n"
         f"👤 {bot_info.get('card_holder')}\n\n"
-        f"📸 عکس رسید را ارسال کنید."
+        f"📸 عکس رسید را ارسال کنید.\n\n"
+        f"⏱ لطفاً تا ساعت {deadline_str} رسید را ارسال کنید، وگرنه این فاکتور به‌طور خودکار منقضی می‌شود."
     )
     if isinstance(target, types.CallbackQuery):
         await show_menu_with_sticker(target.bot, target.message.chat.id, "walletcharge_pay_card", text)
