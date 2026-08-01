@@ -374,8 +374,13 @@ async def show_menu_with_sticker(
         # استیکرهای واقعی وجود دارد، این‌جا هم یک پیام کاملاً نامرئی فقط برای
         # حمل/تازه‌سازی همان منو فرستاده می‌شود (و مثل استیکر، در مرحله‌ی بعد
         # خودش پاک می‌شود؛ هیچ اثر دیداری اضافه‌ای برای کاربر ندارد).
+        # 🐛 فیکس: کاراکتر قبلی «⠀» (U+2800 Braille Pattern Blank) توسط تلگرام به‌عنوان متن کاملاً خالی رد می‌شد
+        # (خطای دقیق تلگرام: "text must be non-empty")، در نتیجه این پیام نامرئی هرگز ارسال نمی‌شد و منوی دائمی
+        # پایین صفحه (وقتی استیکری فرستاده نمی‌شود) دوباره تازه نمی‌شد. به جایش از "⠀"، از "ㅤ"
+        # (U+3164 Hangul Filler) استفاده می‌شود: دقیقاً مثل قبل برای چشم کاربر کاملاً خالی/نامرئی است، ولی
+        # چون یک حرف واقعی (نه کاراکتر جداکننده/فضای‌خالی) است، تلگرام آن را خالی تلقی نمی‌کند.
         try:
-            invisible_msg = await bot.send_message(chat_id, "⠀", reply_markup=main_reply_keyboard())
+            invisible_msg = await bot.send_message(chat_id, "ㅤ", reply_markup=main_reply_keyboard())
             new_sticker_msg_id = invisible_msg.message_id
         except Exception:
             logger.exception("خطا در ارسال پیام نامرئی تازه‌سازی منوی پایین صفحه")
