@@ -27,6 +27,14 @@ _TIMEOUT = aiohttp.ClientTimeout(total=20, connect=10)
 _token_cache = {"token": None, "expires_at": 0.0}
 _templates_cache = {"items": None, "expires_at": 0.0}
 
+# 🐛 فیکس: بعضی قطعی‌های شبکه/DNS بین سرور ربات و پنل مرزبان فقط چند ثانیه طول می‌کشند؛ قبلاً حتی
+# یک قطعی لحظه‌ای همین یک تلاش (بدون هیچ تلاش مجدد) را کاملاً fail می‌کرد و کاربر/ادمین
+# خطای «شبکه/سرور در دسترس نیست» می‌دید با اینکه اسلاگ/پلن کاملاً درست بود (دقیقاً همان
+# «planSlug ارسال‌شده» در پیام خطای ادمین). حالا فقط خطاهای واقعاً شبکه‌ای/اتصالی (نه
+# پاسخ‌های واقعی 4xx/5xx خود پنل) قبل از fail نهایی چند بار با یک مکث کوتاه دوباره امتحان می‌شوند.
+_MAX_PANEL_RETRIES = 2  # در مجموع تا ۳ بار تلاش (تلاش اول + ۲ تلاش مجدد)
+_PANEL_RETRY_DELAY = 1.5
+
 # 🆕 فیکس سرعت: قبلاً هر تک درخواست (حتی فقط برای گرفتن توکن) یک
 # aiohttp.ClientSession کاملاً تازه می‌ساخت، یعنی هر بار یک اتصال TCP+TLS از صفر
 # باز می‌شد؛ همین اصلی‌ترین عامل کند بودن (۱۰-۱۵ ثانیه) ارتباط با پنل مرزبان
@@ -58,23 +66,27 @@ async def _get_token():
         return _token_cache["token"], None
 
     payload = {"username": MARZBAN_USERNAME, "password": MARZBAN_PASSWORD, "grant_type": "password"}
-    try:
-        session = await _get_session()
-        async with session.post(f"{MARZBAN_BASE_URL}/api/admin/token", data=payload) as resp:
-            try:
-                data = await resp.json(content_type=None)
-            except Exception:
-                data = None
-            if resp.status != 200 or not isinstance(data, dict) or not data.get("access_token"):
-                detail = (data or {}).get("detail") if isinstance(data, dict) else None
-                return None, f"ورود به پنل مرزبان ناموفق بود ({resp.status}): {detail or 'بدون جزئیات'}"
-            token = data["access_token"]
-            _token_cache["token"] = token
-            _token_cache["expires_at"] = now + 20 * 60
-            return token, None
-    except Exception:
-        logger.exception("خطا در اتصال به پنل مرزبان هنگام دریافت توکن")
-        return None, "خطا در برقراری ارتباط با پنل مرزبان (شبکه/سرور در دسترس نیست)."
+    for attempt in range(_MAX_PANEL_RETRIES + 1):
+        try:
+            session = await _get_session()
+            async with session.post(f"{MARZBAN_BASE_URL}/api/admin/token", data=payload) as resp:
+                try:
+                    data = await resp.json(content_type=None)
+                except Exception:
+                    data = None
+                if resp.status != 200 or not isinstance(data, dict) or not data.get("access_token"):
+                    detail = (data or {}).get("detail") if isinstance(data, dict) else None
+                    return None, f"ورود به پنل مرزبان ناموفق بود ({resp.status}): {detail or 'بدون جزئیات'}"
+                token = data["access_token"]
+                _token_cache["token"] = token
+                _token_cache["expires_at"] = now + 20 * 60
+                return token, None
+        except Exception:
+            if attempt < _MAX_PANEL_RETRIES:
+                await asyncio.sleep(_PANEL_RETRY_DELAY)
+                continue
+            logger.exception("خطا در اتصال به پنل مرزبان هنگام دریافت توکن")
+            return None, "خطا در برقراری ارتباط با پنل مرزبان (شبکه/سرور در دسترس نیست)."
 
 
 async def _request(method: str, path: str, json_body: dict | None = None, params: dict | None = None):
@@ -83,19 +95,26 @@ async def _request(method: str, path: str, json_body: dict | None = None, params
         return False, None, err
 
     headers = {"Authorization": f"Bearer {token}"}
-    try:
-        session = await _get_session()
-        async with session.request(
-            method, f"{MARZBAN_BASE_URL}{path}", json=json_body, params=params, headers=headers
-        ) as resp:
-            try:
-                data = await resp.json(content_type=None)
-            except Exception:
-                data = None
-            status = resp.status
-    except Exception:
-        logger.exception("خطا در ارتباط با پنل مرزبان (%s %s)", method, path)
-        return False, None, "خطا در برقراری ارتباط با پنل مرزبان (شبکه/سرور در دسترس نیست)."
+    data = None
+    status = None
+    for attempt in range(_MAX_PANEL_RETRIES + 1):
+        try:
+            session = await _get_session()
+            async with session.request(
+                method, f"{MARZBAN_BASE_URL}{path}", json=json_body, params=params, headers=headers
+            ) as resp:
+                try:
+                    data = await resp.json(content_type=None)
+                except Exception:
+                    data = None
+                status = resp.status
+            break
+        except Exception:
+            if attempt < _MAX_PANEL_RETRIES:
+                await asyncio.sleep(_PANEL_RETRY_DELAY)
+                continue
+            logger.exception("خطا در ارتباط با پنل مرزبان (%s %s)", method, path)
+            return False, None, "خطا در برقراری ارتباط با پنل مرزبان (شبکه/سرور در دسترس نیست)."
 
     if status == 401:
         _token_cache["token"] = None
@@ -131,7 +150,11 @@ async def get_templates(force_refresh: bool = False):
     ok, data, msg = await _request("GET", "/api/user_template")
     if ok:
         _templates_cache["items"] = data
-        _templates_cache["expires_at"] = now + 300
+        # 🆕 فیکس سرعت: قبلاً این کش فقط ۵ دقیقه معتبر بود، یعنی هر چند دقیقه یک‌بار برای ساخت هر سرویس یک رفت‌وبرگشت
+        # شبکه‌ای کامل به پنل برای گرفتن کل لیست تمپلیت‌ها اضافه می‌شد و همین یکی از عوامل کند بودن ساخت سرویس بود.
+        # تمپلیت‌ها به‌ندرت تغییر می‌کنند، و در «📦 مشاهده بسته‌های مرزبان» همیشه با force_refresh
+        # تازه خوانده می‌شوند؛ پس کش را به ۳۰ دقیقه افزایش دادیم تا تعداد رفت‌وبرگشت به پنل کمتر شود.
+        _templates_cache["expires_at"] = now + 1800
     return ok, data, msg
 
 
@@ -206,7 +229,7 @@ async def create_user_from_template(template_id: int, username: str):
 
 
 def _data_limit_bytes(volume_gb) -> int:
-    """حجم گیگابایت را به بایت تبدیل می‌کند (0/خالی = نامحدود)."""
+    """حجم گیگابای�� را به بایت تبدیل می‌کند (0/خالی = نامحدود)."""
     try:
         gb = float(volume_gb or 0)
     except (TypeError, ValueError):
