@@ -31,6 +31,7 @@ handlers/marzban_admin.py
 کامل کافی است.
 """
 
+import asyncio
 import html
 import json
 import logging
@@ -167,17 +168,16 @@ async def auto_fulfill_vip_via_marzban(bot, uid, plan_key: str, order_id: int | 
         )
         return False
 
-    await bot.send_message(
-        ADMIN_ID, f"📨 پاسخ پنل {panel_label} (ارسال خودکار بعد از پرداخت):\n<pre>{_pretty(data)}</pre>",
-        parse_mode="HTML",
-    )
-
     link, slug = vpn_panel.extract_link_and_username(data)
     snapshot = {"name": plan.get("name"), "volume_gb": plan.get("volume_gb"), "days": plan.get("days")}
     ctx = {"uid": uid, "plan_key": plan_key, "order_id": order_id, "order_kind": "plan",
            "slug": slug, "snapshot": snapshot}
 
     if not link:
+        await bot.send_message(
+            ADMIN_ID, f"📨 پاسخ پنل {panel_label} (ارسال خودکار بعد از پرداخت):\n<pre>{_pretty(data)}</pre>",
+            parse_mode="HTML",
+        )
         admin_state = _admin_fsm(bot)
         if admin_state:
             await admin_state.update_data(marzban_pending_ctx=ctx)
@@ -189,7 +189,16 @@ async def auto_fulfill_vip_via_marzban(bot, uid, plan_key: str, order_id: int | 
         )
         return True
 
-    await _deliver_marzban_link(bot, ctx, link)
+    # 🆕 فیکس سرعت: دامپ خام پاسخ پنل (فقط برای رفع اشکال ادمین) با ارسال واقعی کانفیگ برای مشتری
+    # کاملاً مستقل است؛ به‌جای پشت‌سرهم، همزمان اجرا می‌شوند تا مشتری منتظر این پیام‌ای
+    # فقط-ادمینی نماند.
+    await asyncio.gather(
+        bot.send_message(
+            ADMIN_ID, f"📨 پاسخ پنل {panel_label} (ارسال خودکار بعد از پرداخت):\n<pre>{_pretty(data)}</pre>",
+            parse_mode="HTML",
+        ),
+        _deliver_marzban_link(bot, ctx, link),
+    )
     return True
 
 
@@ -219,17 +228,16 @@ async def auto_fulfill_custom_via_marzban(bot, user: dict, order_id: int, volume
         )
         return False
 
-    await bot.send_message(
-        ADMIN_ID, f"📨 پاسخ پنل {panel_label} (ارسال خودکار بعد از پرداخت):\n<pre>{_pretty(data)}</pre>",
-        parse_mode="HTML",
-    )
-
     link, slug = vpn_panel.extract_link_and_username(data)
     snapshot = {"name": custom_name or "سرویس سفارشی", "volume_gb": volume, "days": days}
     ctx = {"uid": user["telegram_id"], "plan_key": None, "order_id": order_id, "order_kind": "custom",
            "slug": slug, "snapshot": snapshot}
 
     if not link:
+        await bot.send_message(
+            ADMIN_ID, f"📨 پاسخ پنل {panel_label} (ارسال خودکار بعد از پرداخت):\n<pre>{_pretty(data)}</pre>",
+            parse_mode="HTML",
+        )
         admin_state = _admin_fsm(bot)
         if admin_state:
             await admin_state.update_data(marzban_pending_ctx=ctx)
@@ -241,7 +249,16 @@ async def auto_fulfill_custom_via_marzban(bot, user: dict, order_id: int, volume
         )
         return True
 
-    await _deliver_marzban_link(bot, ctx, link)
+    # 🆕 فیکس سرعت: دامپ خام پاسخ پنل (فقط برای رفع اشکال ادمین) با ارسال واقعی کانفیگ برای مشتری
+    # کاملاً مستقل است؛ به‌جای پشت‌سرهم، همزمان اجرا می‌شوند تا مشتری منتظر این پیام‌ای
+    # فقط-ادمینی نماند.
+    await asyncio.gather(
+        bot.send_message(
+            ADMIN_ID, f"📨 پاسخ پنل {panel_label} (ارسال خودکار بعد از پرداخت):\n<pre>{_pretty(data)}</pre>",
+            parse_mode="HTML",
+        ),
+        _deliver_marzban_link(bot, ctx, link),
+    )
     return True
 
 
@@ -586,14 +603,13 @@ async def marzban_send_service(callback: types.CallbackQuery, state: FSMContext)
         )
         return
 
-    await callback.message.answer(f"📨 پاسخ پنل مرزبان:\n<pre>{_pretty(data)}</pre>", parse_mode="HTML")
-
     link, slug = vpn_panel.extract_link_and_username(data)
     snapshot = {"name": plan.get("name"), "volume_gb": plan.get("volume_gb"), "days": plan.get("days")}
     ctx = {"uid": uid, "plan_key": plan_key, "order_id": order_id, "order_kind": "plan",
            "slug": slug, "snapshot": snapshot}
 
     if not link:
+        await callback.message.answer(f"📨 پاسخ پنل مرزبان:\n<pre>{_pretty(data)}</pre>", parse_mode="HTML")
         await state.update_data(marzban_pending_ctx=ctx)
         await state.set_state(AdminStates.waiting_marzban_manual_link)
         await callback.message.answer(
@@ -602,7 +618,12 @@ async def marzban_send_service(callback: types.CallbackQuery, state: FSMContext)
         )
         return
 
-    await _deliver_marzban_link(callback.bot, ctx, link)
+    # 🆕 فیکس سرعت: دامپ خام پاسخ پنل را همزمان با ارسال واقعی کانفیگ برای مشتری اجرا می‌کنیم
+    # تا مشتری منتظر پیام فقط-ادمینی نماند.
+    await asyncio.gather(
+        callback.message.answer(f"📨 پاسخ پنل مرزبان:\n<pre>{_pretty(data)}</pre>", parse_mode="HTML"),
+        _deliver_marzban_link(callback.bot, ctx, link),
+    )
 
 
 @router.callback_query(F.data.startswith("marzbancustom_"))
@@ -668,8 +689,6 @@ async def marzban_custom_pick(callback: types.CallbackQuery, state: FSMContext):
         )
         return
 
-    await callback.message.answer(f"📨 پاسخ پنل مرزبان:\n<pre>{_pretty(data)}</pre>", parse_mode="HTML")
-
     link, slug = vpn_panel.extract_link_and_username(data)
     snapshot = {"name": order.get("custom_name") or "سرویس سفارشی",
                 "volume_gb": order["volume_gb"], "days": order["days"]}
@@ -677,6 +696,7 @@ async def marzban_custom_pick(callback: types.CallbackQuery, state: FSMContext):
            "slug": slug, "snapshot": snapshot}
 
     if not link:
+        await callback.message.answer(f"📨 پاسخ پنل مرزبان:\n<pre>{_pretty(data)}</pre>", parse_mode="HTML")
         await state.update_data(marzban_pending_ctx=ctx)
         await state.set_state(AdminStates.waiting_marzban_manual_link)
         await callback.message.answer(
@@ -685,7 +705,12 @@ async def marzban_custom_pick(callback: types.CallbackQuery, state: FSMContext):
         )
         return
 
-    await _deliver_marzban_link(callback.bot, ctx, link)
+    # 🆕 فیکس سرعت: دامپ خام پاسخ پنل را همزمان با ارسال واقعی کانفیگ برای مشتری اجرا می‌کنیم
+    # تا مشتری منتظر پیام فقط-ادمینی نماند.
+    await asyncio.gather(
+        callback.message.answer(f"📨 پاسخ پنل مرزبان:\n<pre>{_pretty(data)}</pre>", parse_mode="HTML"),
+        _deliver_marzban_link(callback.bot, ctx, link),
+    )
 
 
 @router.message(AdminStates.waiting_marzban_manual_link)
@@ -753,38 +778,49 @@ async def _deliver_marzban_link(bot, ctx: dict, link: str):
         config_type=config_type, service_id=slug, source=vpn_panel.active_panel() or "marzban",
     )
 
-    sent_photo_file_id = None
-    try:
-        if qrcode:
-            photo = types.BufferedInputFile(_make_qr_bytes(link), filename="qr.png")
-            sent = await bot.send_photo(
-                int(uid), photo, caption=caption, reply_markup=config_delivery_keyboard(bot_info.get('connection_guide_url'))
-            )
-            if sent.photo:
-                sent_photo_file_id = sent.photo[-1].file_id
-        else:
-            await bot.send_message(
-                int(uid), caption, reply_markup=config_delivery_keyboard(bot_info.get('connection_guide_url'))
-            )
-        await bot.send_message(ADMIN_ID, "✅ سرویس به‌صورت خودکار ساخته و برای کاربر ارسال شد.")
-    except Exception as e:
-        await bot.send_message(ADMIN_ID, f"⚠️ سرویس ساخته و ذخیره شد ولی ارسال پیام به کاربر ناموفق بود: {e}")
-
-    if sent_photo_file_id:
-        db.set_config_qr(config_id, sent_photo_file_id)
-
     if order_kind == "plan" and order_id:
         db.set_order_status(order_id, "fulfilled")
     elif order_kind == "custom" and order_id:
         db.set_custom_order_status(order_id, "fulfilled")
 
-    await _log_fulfilled_order(
-        bot, user,
-        plan_order_id=order_id if order_kind == "plan" else None,
-        custom_order_id=order_id if order_kind == "custom" else None,
-        service_id=slug, service_name=name,
-        package_text=f"{volume_text} | {days_text}", expiry_text=expiry_date or "نامحدود",
+    async def _send_to_customer():
+        if qrcode:
+            photo = types.BufferedInputFile(_make_qr_bytes(link), filename="qr.png")
+            sent = await bot.send_photo(
+                int(uid), photo, caption=caption, reply_markup=config_delivery_keyboard(bot_info.get('connection_guide_url'))
+            )
+            return sent.photo[-1].file_id if sent.photo else None
+        await bot.send_message(
+            int(uid), caption, reply_markup=config_delivery_keyboard(bot_info.get('connection_guide_url'))
+        )
+        return None
+
+    # 🆕 فیکس سرعت: قبلاً ارسال کانفیگ به مشتری، پیام تأیید به ادمین، و ثبت لاگ سفارش در کانال
+    # «اعتماد» (که خودش شامل یک get_chat + یک send_message جداست) کاملاً پشت‌سرهم ارسال می‌شدند؛ همین زنجیره‌ی رفت‌وبرگشت‌های متوالی، اصلی‌ترین عامل کند بودن
+    # (۱۰-۱۵ ثانیه) کل فرآیند «ساخت و ارسال سرویس» بود، نه فقط ارتباط با پنل. چون این پیام‌ها کاملاً
+    # مستقل از هم‌اند، حالا همزمان (concurrent) اجرا می‌شوند تا زمانشان روی هم جمع نشود.
+    send_result, log_result = await asyncio.gather(
+        _send_to_customer(),
+        _log_fulfilled_order(
+            bot, user,
+            plan_order_id=order_id if order_kind == "plan" else None,
+            custom_order_id=order_id if order_kind == "custom" else None,
+            service_id=slug, service_name=name,
+            package_text=f"{volume_text} | {days_text}", expiry_text=expiry_date or "نامحدود",
+        ),
+        return_exceptions=True,
     )
+
+    if isinstance(send_result, Exception):
+        logger.exception("ارسال کانفیگ به کاربر ناموفق بود", exc_info=send_result)
+        await bot.send_message(ADMIN_ID, f"⚠️ سرویس ساخته و ذخیره شد ولی ارسال پیام به کاربر ناموفق بود: {send_result}")
+    else:
+        if send_result:
+            db.set_config_qr(config_id, send_result)
+        await bot.send_message(ADMIN_ID, "✅ سرویس به‌صورت خودکار ساخته و برای کاربر ارسال شد.")
+
+    if isinstance(log_result, Exception):
+        logger.exception("ثبت لاگ سفارش در کانال اعتماد ناموفق بود", exc_info=log_result)
 
 
 # ---------------------------------------------------------------------------
