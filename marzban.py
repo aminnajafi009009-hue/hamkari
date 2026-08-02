@@ -229,7 +229,7 @@ async def create_user_from_template(template_id: int, username: str):
 
 
 def _data_limit_bytes(volume_gb) -> int:
-    """حجم گیگابای�� را به بایت تبدیل می‌کند (0/خالی = نامحدود)."""
+    """حجم گیگابایت را به بایت تبدیل می‌کند (0/خالی = نامحدود)."""
     try:
         gb = float(volume_gb or 0)
     except (TypeError, ValueError):
