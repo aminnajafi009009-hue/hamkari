@@ -13,7 +13,7 @@ import threading
 import aiohttp
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import ErrorEvent
+from aiogram.types import ErrorEvent, BotCommand, MenuButtonCommands
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.dispatcher.middlewares.base import BaseMiddleware
 
@@ -194,6 +194,19 @@ async def run_bot():
     logger.info("Database initialized.")
 
     bot = Bot(token=TOKEN)
+
+    # 🆕 فیکس: تا اینجا دکمه‌ی منوی بوم/گرید (کنار دکمه‌ی پیوست) در تلگرام اصلاً پیکربندی نمی‌شد، چون هیچ‌جا با
+    # set_my_commands / set_chat_menu_button صدا زده نمی‌شد. آن دکمه‌ای تگل-و-پایین که قبلاً تلاش
+    # شده بود درست کنیم (فلش کیبورد خودکار)، بلکه تلگرام مستقلاً برای هر چت و هر کاربر
+    # یک دکمه‌ی "Menu" (آیکون چهارخانه) کنار گیره‌ی اتصال (برای باز کردن لیست فرمان‌ها) نشان می‌دهد.
+    try:
+        await bot.set_my_commands([
+            BotCommand(command="start", description="شروع / بازکردن منوی اصلی"),
+        ])
+        await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+    except Exception:
+        logger.exception("خطا در تنظیم دکمه‌ی منوی بوم (set_chat_menu_button)")
+
     # 🐛 فیکس: قبلاً MemoryStorage (فقط RAM) بود، با هر ری‌استارت state گم می‌شد.
     dp = Dispatcher(storage=fsm_storage.DBStorage())
     dp.errors.register(global_error_handler)
