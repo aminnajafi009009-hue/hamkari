@@ -983,7 +983,7 @@ async def approve_purchase(callback: types.CallbackQuery):
         try:
             db.use_discount(pending["discount_code"], user["id"])
         except Exception:
-            logging.getLogger(__name__).exception("خطا در مصرف ����د تخفیف کارت‌به‌کارت")
+            logging.getLogger(__name__).exception("خطا در مصرف کد تخفیف کارت‌به‌کارت")
 
     if plan.get("volume_gb", 0) >= REFERRAL_MIN_VOLUME_GB:
         try:
@@ -1637,7 +1637,7 @@ async def _render_pending_receipts(callback: types.CallbackQuery):
     if total == 0:
         text = "🧾 رسیدهای در انتظار تایید\n\n✅ در حال حاضر هیچ رسید در انتظار تاییدی وجود ندارد."
     else:
-        text = f"🧾 رسیدهای در انتظار تایید — {total} مورد\n\nروی ✅ برا�� تایید یا ❌ برای رد بزن 👇"
+        text = f"🧾 رسیدهای در انتظار تایید — {total} مورد\n\nروی ✅ برای تایید یا ❌ برای رد بزن 👇"
 
     await callback.message.edit_text(text, reply_markup=admin_pending_receipts_keyboard(receipts, custom_receipts))
 
@@ -1852,7 +1852,7 @@ async def _service_detail_text(cfg: dict) -> str:
     """
     توجه: قبلاً این متن با parse_mode="Markdown" (نسخه‌ی قدیمی مارک‌داون
     تلگرام) فرستاده می‌شد و cfg['plan'] بدون هیچ escape‌ای مستقیم داخل متن
-    ق��ار می‌گرفت. نسخه‌ی قدیمی Markdown تلگرام امکان escape کردن کاراکترهای
+    قرار می‌گرفت. نسخه‌ی قدیمی Markdown تلگرام امکان escape کردن کاراکترهای
     خاص رو نداره؛ پس اگر نام پلن یک زیرخط (_) تک و جفت‌نشده داشت (مثل
     "Businesss_vpn - 1090174")، پارسر اون رو شروع ایتالیک در نظر می‌گرفت و
     چون بسته نمی‌شد، کل درخواست ویرایش پیام با خطای "can't parse entities"
@@ -2916,7 +2916,7 @@ async def new_agent_percent_input(message: types.Message, state: FSMContext):
 @router.callback_query(F.data.startswith("deleteagent_"))
 async def delete_agent(callback: types.CallbackQuery):
     if not _is_admin(callback.from_user.id):
-        await callback.answer("⛔ دستر��ی ندارید.", show_alert=True)
+        await callback.answer("⛔ دسترسی ندارید.", show_alert=True)
         return
     tid = callback.data.replace("deleteagent_", "")
     db.remove_agent(tid)
@@ -3892,7 +3892,7 @@ async def admin_guide_edit_content_start(callback: types.CallbackQuery, state: F
     await state.set_state(AdminStates.waiting_guide_edit_content)
     await state.update_data(guide_edit_id=guide_id)
     await callback.message.answer(
-        f"📝 محتوای جدید برای «{guide['title']}» را بفرستید (متن، ��کس با کپشن، یا فیلم با کپشن):",
+        f"📝 محتوای جدید برای «{guide['title']}» را بفرستید (متن، عکس با کپشن، یا فیلم با کپشن):",
         reply_markup=admin_guide_cancel_keyboard(),
     )
     await callback.answer()
@@ -4257,7 +4257,7 @@ async def admin_botinfo_edit_save(message: types.Message, state: FSMContext):
         cleaned = re.sub(r"[^A-Za-z0-9_]+", "", value)
         if not cleaned:
             await message.answer(
-                "❌ پیشوند باید فقط از حروف/��دد انگلیسی و زیرخط (_) تشکیل شده باشد؛ دوباره وارد کن:"
+                "❌ پیشوند باید فقط از حروف/عدد انگلیسی و زیرخط (_) تشکیل شده باشد؛ دوباره وارد کن:"
             )
             return
         value = cleaned
@@ -4592,7 +4592,7 @@ async def admin_panel_choose_set(callback: types.CallbackQuery):
     name = callback.data.replace("panelchoose_", "", 1)
     available = vpn_panel.available_panels()
     if name not in available:
-        await callback.answer("این پنل ��صل نیست.", show_alert=True)
+        await callback.answer("این پنل وصل نیست.", show_alert=True)
         return
     vpn_panel.set_active_panel(name)
     active = vpn_panel.active_panel()
