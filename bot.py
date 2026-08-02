@@ -23,6 +23,7 @@ import payments
 import alerts
 import fsm_storage
 import bot_loop
+import vpn_panel
 from config import TOKEN, UNIQUEPAY_ENABLED, ADMIN_ID
 from keyboards import all_reply_menu_texts
 from handlers import menu, start, wallet, profile, referral, plans, ticket, admin, marzban_admin
@@ -226,6 +227,7 @@ async def run_bot():
     if UNIQUEPAY_ENABLED:
         asyncio.create_task(online_payment_poller(bot))
     asyncio.create_task(self_ping_loop())
+    asyncio.create_task(panel_cache_warmup_loop())
 
     logger.info("Bot starting polling...")
     await dp.start_polling(bot)
@@ -340,6 +342,26 @@ async def invoice_expiry_loop(bot: Bot):
 
 
 SELF_PING_INTERVAL_SECONDS = 600  # ۱۰ دقیقه؛ زیر آستانه‌ی خواب ۱۵ دقیقه‌ای Render رایگان.
+
+
+PANEL_CACHE_WARMUP_SECONDS = 600
+
+
+async def panel_cache_warmup_loop():
+    """🆕 فیکس سرعت: توکن ادمین و لیست تمپلیت‌های پنل VPN فعال را هر ۱۰ دقیقه
+    در پس‌زمینه زنده نگه می‌دارد (توکن ۲۰ دقیقه و تمپلیت‌ها ۳۰ دقیقه
+    معتبر هستند). بدون این کار، اگر بین دو درخواست ساخت سرویس فاصله‌ای طولانی
+    بیفتد، اولین درخواست بعدی مجبور می‌شد قبل از ساخت واقعی سرویس، یک بار لاگین
+    بزند و دوباره توکن بگیرد و لیست تمپلیت‌ها را از پنل بخواند — دقیقاً همان
+    ۱۰-۱۵ ثانیه‌ای که گزارش شده بود. با این حلقه، کش همیشه گرم نگه داشته می‌شود و هر درخواست
+    واقعی ساخت سرویس فقط همان یک درخواست شبکه‌ای واقعی (ساخت کاربر) باقی می‌ماند.
+    """
+    while True:
+        try:
+            await vpn_panel.warmup_cache()
+        except Exception:
+            logger.exception("خطا در گرم‌کردن دوره‌ای کش پنل VPN")
+        await asyncio.sleep(PANEL_CACHE_WARMUP_SECONDS)
 
 
 async def self_ping_loop():
