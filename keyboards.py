@@ -59,9 +59,9 @@ def main_reply_keyboard():
             [KeyboardButton(text="🤝 درخواست نمایندگی", style="danger")],
         ],
         resize_keyboard=True,
-        # فیکس: بدون is_persistent=True، تلگرام بعد از هر پیامی که دکمه‌ی inline دارد
-        # (مثل پیام تحویل کانفیگ/کیوآرکد) منوی پایین صفحه را جمع می‌کند و کاربر باید
-        # با دست دوباره بازش کند؛ با این مقدار، منو همیشه باز/در دسترس می‌ماند.
+        # 🆕 فیکس نهایی: is_persistent=True برگردانده شد تا دکمه‌ی چهارخونه‌ی پنهان/نمایان
+        # کردن منو همیشه در کنار صفحه باقی بماند (حتی وقتی که کیبورد تایپ بسته است)،
+        # نه فقط وقتی کیبورد تایپ باز باشد.
         is_persistent=True,
     )
 
@@ -100,8 +100,8 @@ def admin_reply_keyboard(orders_enabled: bool | None = None, permissions: set[st
         rows.append([KeyboardButton(text="👮 مدیریت ادمین‌ها", style="danger")])
     if not rows:
         rows = [[KeyboardButton(text="⛔ بدون دسترسی", style="danger")]]
-    # فیکس: is_persistent=True تا این منو هم بعد از پیام‌های دارای دکمه‌ی inline (مثل
-    # تأیید/رد رسید یا هر پیام دیگر) جمع نشود و همیشه در دسترس ادمین/ادمین فرعی بماند.
+    # 🆕 فیکس نهایی: همان دلیل بالا در main_reply_keyboard — is_persistent=True برگردانده شد
+    # تا دکمه‌ی چهارخونه همیشه (حتی بدون بازبودن کیبورد تایپ) در دسترس باشد.
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True, is_persistent=True)
 
 
@@ -238,7 +238,7 @@ def custom_build_payment_keyboard():
     ]
     if UNIQUEPAY_ENABLED:
         buttons.append(
-            [InlineKeyboardButton(text="🌐 پرداخت آنلاین (تایید خودکار)", callback_data="cbuild_pay_online", style="success")]
+            [InlineKeyboardButton(text="🌐 پرداخت آنلاین (تایید خودکا��)", callback_data="cbuild_pay_online", style="success")]
         )
     buttons.append([InlineKeyboardButton(text="💳 پرداخت کارت به کارت", callback_data="cbuild_pay_card", style="success")])
     buttons.append([InlineKeyboardButton(text="🔙 انصراف", callback_data="plans", style="danger")])
@@ -454,7 +454,7 @@ def gaming_ready_keyboard(config_id):
 # پنل ادمین
 # ---------------------------------------------------------------------------
 def admin_panel_menu(orders_enabled: bool = True, permissions: set[str] | None = None, is_main_admin: bool = True):
-    """Inline admin panel. برای ادمین فرعی دکمه‌های بدون مجوز اصلاً نمایش داده نمی‌شود."""
+    """Inline admin panel (دکمه‌های شیشه‌ای). برای ادمین فرعی دکمه‌های بدون مجوز اصلاً نمایش داده نمی‌شود."""
     def allowed(perm: str) -> bool:
         return is_main_admin or permissions is None or perm in permissions
 
@@ -729,7 +729,7 @@ def admin_pending_receipts_keyboard(receipts, custom_receipts):
     buttons = []
     for r in receipts:
         # 🐛 فیکس: r["id"] (شناسه‌ی خود ردیف pending_receipts) را هم در callback_data می‌فرستیم تا در
-        # صف رسیدهای در انتظار هم که کاربر/مبلغشان یکسان است، قفل ضدتکرار با هم تداخل نکند.
+        # صف رسیدهای در انتظار هم که کاربر/مبلغشان یکسان است، قفل ضدتکرار با هم تداخل نکن��.
         if r["kind"] == "charge":
             label = f"💰 شارژ {r['amount']:,} ت — {r['telegram_id']}"
             buttons.append([
