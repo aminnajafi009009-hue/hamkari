@@ -142,7 +142,7 @@ BOT_USERNAME = _get_env("BOT_USERNAME", required=False, default="BusinessSVPNBot
 
 # اگر UNIQUEPAY_REDIRECT_URL در .env تنظیم نشده باشد، پیش‌فرض لینک خود ربات
 # است (باید این آدرس هم در پنل uniquepay.top به‌عنوان دامنه‌ی مجاز ثبت شود).
-UNIQUEPAY_REDIRECT_URL = UNIQUEPAY_REDIRECT_URL or f"https://t.me/{BOT_USERNAME}"
+UNIQUEPAY_REDIRECT_URL = UNIQUEPAY_REDIRECT_URL or ("https://t.me/" + BOT_USERNAME)
 
 # ---------------------------------------------------------------------------
 # «بساز سرویس خودت» — محاسبه‌ی قیمت سرویس سفارشی
