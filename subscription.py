@@ -190,19 +190,34 @@ async def extract_meta(sub_url: str, _depth: int = 0, _retry: int = 0) -> dict |
 
 
 def _b64_decode_any(text: str) -> str | None:
-    """🆕 فیکس: بعضی پنل‌ها (مثل همینی که توکنش در URL از حروف - و _ استفاده می‌کند)
-    بدنه‌ی ساب را با base64 نوع URL-safe برمی‌گردانند، نه base64 استاندارد.
-    base64.b64decode استاندارد به‌جای خطا دادن روی کاراکترهای - و _، آن‌ها را
-    بی‌سروصدا حذف می‌کند و کل رشته را خراب می‌کند؛ در نتیجه هیچ vmess://‎ یا
-    vless://‎ ای در متن دیکودشده پیدا نمی‌شد (باگ گزارش‌شده: «لینک ساب باز شد
-    ولی هیچ کانفیگ تکی پیدا نشد» برای همه‌ی سرویس‌های فعال). این تابع هر دو
-    نوع base64 (استاندارد و URL-safe) را امتحان می‌کند."""
+    """تلاش می‌کند یک رشته متن به‌صورت base64 را با هردو الفبای استاندارد
+    (+/) و URL-safe (-_) دکد کند.
+
+    🐛 فیکس: قبلاً فقط با الفبای استاندارد base64 دکد می‌شد. برخی پنل‌ها (مثل
+    همین لینک panel.iammehrab.sbs) بدنه‌ی لینک ساب را با الفبای URL-safe (کاراکترهای
+    "-" و "_" به‌جای "+" و "/") برمی‌گرداندند. تابع قبلی base64.b64decode این کاراکترها را
+    بی‌صدا می‌انداخت (نه خطا می‌داد نه درست دکد می‌کند)، نتیجه متن خراب تولید می‌شد
+    که هیچ‌کدام از اسکیم‌های کانفیگ (vmess://، ...) را ندارد، در نتیجه پیام «هیچ کانفیگ
+    تکی‌ای پیدا نشد» نشان داده می‌شد در حالی‌که لینک کاملاً معتبر بود.
+    """
     if not text:
         return None
-    padded = text + "=" * (-len(text) % 4)
-    for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+    # خطوط جدید/فاصله‌های داخل بدنه‌ی base64 را حذف می‌کنیم (بعضی پنل‌ها خروجی
+    # را به‌صورت chunk‌شده در چند خط برمی‌گردانند).
+    cleaned = re.sub(r"\s+", "", text)
+    if not cleaned:
+        return None
+    padded_std = cleaned + "=" * (-len(cleaned) % 4)
+    # همان رشته با الفبای URL-safe جایگزین شده (برای اینکه base64.b64decode
+    # هم بتواند کاراکترهای "-"/"_" را درست تفسیر کند).
+    padded_urlsafe = padded_std.replace("-", "+").replace("_", "/")
+    for candidate_text, decoder in (
+        (padded_std, base64.b64decode),
+        (padded_urlsafe, base64.b64decode),
+        (padded_std, base64.urlsafe_b64decode),
+    ):
         try:
-            decoded = decoder(padded).decode("utf-8", errors="ignore")
+            decoded = decoder(candidate_text).decode("utf-8", errors="ignore")
         except Exception:
             continue
         if decoded and any(s in decoded for s in _CONFIG_SCHEMES):
@@ -211,13 +226,21 @@ def _b64_decode_any(text: str) -> str | None:
 
 
 def _parse_configs(body: str) -> list[str]:
-    """بدنه‌ی خام لینک ساب (معمولاً base64 استاندارد یا URL-safe) را به لیست کانفیگ‌های تکی تبدیل می‌کند."""
+    """بدنه‌ی خام لینک ساب (معمولاً base64، احتمالاً با الفبای URL-safe) را به لیست
+    کانفیگ‌های تکی تبدیل می‌کند."""
     if not body:
         return []
     text = body.strip()
     decoded = _b64_decode_any(text)
 
-    candidate = decoded if decoded else text
+    if decoded:
+        candidate = decoded
+    elif any(s in text for s in _CONFIG_SCHEMES):
+        # بدنه از قبل هم کانفیگ خام (بدون رمزنگاری) بوده
+        candidate = text
+    else:
+        candidate = ""
+
     lines = [ln.strip() for ln in candidate.splitlines() if ln.strip()]
     return [ln for ln in lines if ln.startswith(_CONFIG_SCHEMES)]
 
