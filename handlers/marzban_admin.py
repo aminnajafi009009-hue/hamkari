@@ -164,7 +164,7 @@ async def auto_fulfill_vip_via_marzban(bot, uid, plan_key: str, order_id: int | 
             f"ساخت سرویس در پنل ناموفق بود:\n{msg}\n"
             f"🔑 planSlug ارسال‌شده: {mapping['plan_slug']}\n\n"
             "لطفاً از دکمه‌ی ارسال دستی زیر همین سفارش استفاده کن. "
-            "اگه خطا NOT_FOUND بود، احتمالاً باید این نگاشت رو دوباره از منوی پنل فعال تنظیم کنی (توجه: نگاشت بسته به پنل فعلی بستگی دارد — اگر پنل فعال را عوض کردید، باید ��وباره از روی همان پنل نگاشت کنید).",
+            "اگه خطا NOT_FOUND بود، احتمالاً باید این نگاشت رو دوباره از منوی پنل فعال تنظیم کنی (توجه: نگاشت بسته به پنل فعلی بستگی دارد — اگر پنل فعال را عوض کردید، باید دوباره از روی همان پنل نگاشت کنید).",
         )
         return False
 
@@ -198,7 +198,6 @@ async def auto_fulfill_vip_via_marzban(bot, uid, plan_key: str, order_id: int | 
             parse_mode="HTML",
         ),
         _deliver_marzban_link(bot, ctx, link),
-        return_exceptions=True,
     )
     return True
 
@@ -259,7 +258,6 @@ async def auto_fulfill_custom_via_marzban(bot, user: dict, order_id: int, volume
             parse_mode="HTML",
         ),
         _deliver_marzban_link(bot, ctx, link),
-        return_exceptions=True,
     )
     return True
 
@@ -622,21 +620,9 @@ async def marzban_send_service(callback: types.CallbackQuery, state: FSMContext)
 
     # 🆕 فیکس سرعت: دامپ خام پاسخ پنل را همزمان با ارسال واقعی کانفیگ برای مشتری اجرا می‌کنیم
     # تا مشتری منتظر پیام فقط-ادمینی نماند.
-    # 🐛 فیکس: `callback.message.answer(...)` یک کروتین معمولی برنمی‌گرداند — در aiogram این شارت‌کات
-    # روی Message یک شیء خام قابل‌اجرا (SendMessage) برمی‌گردانند که چون pydantic مدل قابل‌تغییر است،
-    # قابل هش شدن (hashable) نیست. وقتی مستقیم داخل asyncio.gather پاس داده می‌شد، خود asyncio.gather
-    # برای حذف تکراری‌ها سعی می‌کند آن را هش کند و قبل از اجرای هر کدام از دو تاسک
-    # (همزمان با ساخت و ارسال سرویس) با خطای "TypeError: unhashable type: 'SendMessage'"
-    # کرش می‌کرد — قبل از اینکه هیچکدام از دو تاسک اجرا شود (حتی _deliver_marzban_link هم)؛ برای
-    # همین بود که دقیقاً همین خطا باعث می‌شد سرویس در پنل ساخته شود ولی هیچ وقت نه به مشتری
-    # چیزی ارسال شود و نه هیچ پیامی هم به ادمین برسد. فیکس: به‌جای آن، از `bot.send_message(...)`
-    # استفاده می‌کنیم که یک کروتین واقعی (قابل هش شدن) برمی‌گرداند.
     await asyncio.gather(
-        callback.bot.send_message(
-            callback.message.chat.id, f"📨 پاسخ پنل مرزبان:\n<pre>{_pretty(data)}</pre>", parse_mode="HTML",
-        ),
+        callback.bot.send_message(callback.message.chat.id, f"📨 پاسخ پنل مرزبان:\n<pre>{_pretty(data)}</pre>", parse_mode="HTML"),
         _deliver_marzban_link(callback.bot, ctx, link),
-        return_exceptions=True,
     )
 
 
@@ -721,21 +707,9 @@ async def marzban_custom_pick(callback: types.CallbackQuery, state: FSMContext):
 
     # 🆕 فیکس سرعت: دامپ خام پاسخ پنل را همزمان با ارسال واقعی کانفیگ برای مشتری اجرا می‌کنیم
     # تا مشتری منتظر پیام فقط-ادمینی نماند.
-    # 🐛 فیکس: `callback.message.answer(...)` یک کروتین معمولی برنمی‌گرداند — در aiogram این شارت‌کات
-    # روی Message یک شیء خام قابل‌اجرا (SendMessage) برمی‌گردانند که چون pydantic مدل قابل‌تغییر است،
-    # قابل هش شدن (hashable) نیست. وقتی مستقیم داخل asyncio.gather پاس داده می‌شد، خود asyncio.gather
-    # برای حذف تکراری‌ها سعی می‌کند آن را هش کند و قبل از اجرای هر کدام از دو تاسک
-    # (همزمان با ساخت و ارسال سرویس) با خطای "TypeError: unhashable type: 'SendMessage'"
-    # کرش می‌کرد — قبل از اینکه هیچکدام از دو تاسک اجرا شود (حتی _deliver_marzban_link هم)؛ برای
-    # همین بود که دقیقاً همین خطا باعث می‌شد سرویس در پنل ساخته شود ولی هیچ وقت نه به مشتری
-    # چیزی ارسال شود و نه هیچ پیامی هم به ادمین برسد. فیکس: به‌جای آن، از `bot.send_message(...)`
-    # استفاده می‌کنیم که یک کروتین واقعی (قابل هش شدن) برمی‌گرداند.
     await asyncio.gather(
-        callback.bot.send_message(
-            callback.message.chat.id, f"📨 پاسخ پنل مرزبان:\n<pre>{_pretty(data)}</pre>", parse_mode="HTML",
-        ),
+        callback.bot.send_message(callback.message.chat.id, f"📨 پاسخ پنل مرزبان:\n<pre>{_pretty(data)}</pre>", parse_mode="HTML"),
         _deliver_marzban_link(callback.bot, ctx, link),
-        return_exceptions=True,
     )
 
 
@@ -774,103 +748,79 @@ async def _deliver_marzban_link(bot, ctx: dict, link: str):
         await bot.send_message(ADMIN_ID, "❌ کاربر یافت نشد؛ سرویس در پنل مرزبان ساخته شد ولی ارسال نشد.")
         return
 
-    # 🐛 فیکس: قبلاً هیچ try/except دور بدنه‌ی این تابع نبود. این تابع همیشه داخل
-    # asyncio.gather بدون return_exceptions=True صدا زده می‌شود (کنار پیام دامپ خام
-    # پنل)؛ یعنی اگر یک خطای غیرمنتظره (مثلاً در رمزنگاری/ذخیره در دیتابیس) قبل از
-    # رسیدن به بخش ارسال رخ می‌داد، این تابع کاملاً بی‌صدا کرش می‌کرد: نه مشتری چیزی
-    # می‌گرفت، نه ادمین هیچ پیام خطایی می‌دید — دقیقاً همان «سرویس در پنل ساخته شد ولی
-    # به کاربر ارسال نشد و هیچ پیامی هم نیامد» که گزارش شده بود. حالا کل بدنه را
-    # می‌گیریم تا ادمین همیشه یک پیام (موفق یا ناموفق با جزئیات دقیق خطا) ببیند و
-    # لینک ساخته‌شده هم گم نشود.
-    try:
-        name = snap.get("name") or "کاربر"
-        volume_gb = snap.get("volume_gb")
-        days = snap.get("days")
-        volume_text = _format_volume_gb_label(volume_gb) if volume_gb else "طبق بسته‌ی مرزبان"
-        days_text = f"{days} روز" if days else "نامحدود"
-        expiry_date = (now_tehran_naive() + timedelta(days=days)).strftime("%Y-%m-%d") if days else None
+    name = snap.get("name") or "کاربر"
+    volume_gb = snap.get("volume_gb")
+    days = snap.get("days")
+    volume_text = _format_volume_gb_label(volume_gb) if volume_gb else "طبق بسته‌ی مرزبان"
+    days_text = f"{days} روز" if days else "نامحدود"
+    expiry_date = (now_tehran_naive() + timedelta(days=days)).strftime("%Y-%m-%d") if days else None
 
-        caption = (
-            "✅ سرویس با موفقیت ایجاد شد\n\n"
-            f"👤 نام کاربری سرویس : {name}\n"
-            "🇺🇳 لوکیشن: مولتی لوکیشن+تانل\n"
-            f"⏳ مدت زمان: {days_text}\n"
-            f"🗜 حجم سرویس: {volume_text}\n"
-            "👤 تعداد کاربر:نامحدود\n\n"
-            "لینک اتصال:\n"
-            f"{link}\n\n"
-            "🧑‍🦯 شما میتوانید شیوه اتصال را با فشردن دکمه زیر دریافت کنید."
-        )
+    caption = (
+        "✅ سرویس با موفقیت ایجاد شد\n\n"
+        f"👤 نام کاربری سرویس : {name}\n"
+        "🇺🇳 لوکیشن: مولتی لوکیشن+تانل\n"
+        f"⏳ مدت زمان: {days_text}\n"
+        f"🗜 حجم سرویس: {volume_text}\n"
+        "👤 تعداد کاربر:نامحدود\n\n"
+        "لینک اتصال:\n"
+        f"{link}\n\n"
+        "🧑‍🦯 شما میتوانید شیوه اتصال را با فشردن دکمه زیر دریافت کنید."
+    )
 
-        encrypted = crypto.encrypt_config(link)
-        plan_name = f"{name} | {volume_text} | {days_text}"
-        config_type = db.plan_type(plan_key) if plan_key else "vip"
-        if config_type == "test":
-            config_type = "vip"
+    encrypted = crypto.encrypt_config(link)
+    plan_name = f"{name} | {volume_text} | {days_text}"
+    config_type = db.plan_type(plan_key) if plan_key else "vip"
+    if config_type == "test":
+        config_type = "vip"
 
-        config_id = db.add_config(
-            user["id"], plan_name, encrypted, expiry=expiry_date,
-            config_type=config_type, service_id=slug, source=vpn_panel.active_panel() or "marzban",
-        )
+    config_id = db.add_config(
+        user["id"], plan_name, encrypted, expiry=expiry_date,
+        config_type=config_type, service_id=slug, source=vpn_panel.active_panel() or "marzban",
+    )
 
-        if order_kind == "plan" and order_id:
-            db.set_order_status(order_id, "fulfilled")
-        elif order_kind == "custom" and order_id:
-            db.set_custom_order_status(order_id, "fulfilled")
+    if order_kind == "plan" and order_id:
+        db.set_order_status(order_id, "fulfilled")
+    elif order_kind == "custom" and order_id:
+        db.set_custom_order_status(order_id, "fulfilled")
 
-        async def _send_to_customer():
-            if qrcode:
-                photo = types.BufferedInputFile(_make_qr_bytes(link), filename="qr.png")
-                sent = await bot.send_photo(
-                    int(uid), photo, caption=caption, reply_markup=config_delivery_keyboard(bot_info.get('connection_guide_url'))
-                )
-                return sent.photo[-1].file_id if sent.photo else None
-            await bot.send_message(
-                int(uid), caption, reply_markup=config_delivery_keyboard(bot_info.get('connection_guide_url'))
+    async def _send_to_customer():
+        if qrcode:
+            photo = types.BufferedInputFile(_make_qr_bytes(link), filename="qr.png")
+            sent = await bot.send_photo(
+                int(uid), photo, caption=caption, reply_markup=config_delivery_keyboard(bot_info.get('connection_guide_url'))
             )
-            return None
-
-        # 🆕 فیکس سرعت: قبلاً ارسال کانفیگ به مشتری، پیام تأیید به ادمین، و ثبت لاگ سفارش در کانال
-        # «اعتماد» (که خودش شامل یک get_chat + یک send_message جداست) کاملاً پشت‌سرهم ارسال می‌شدند؛ همین زنجیره‌ی رفت‌وبرگشت‌های متوالی، اصلی‌ترین عامل کند بودن
-        # (۱۰-۱۵ ثانیه) کل فرآیند «ساخت و ارسال سرویس» بود، نه فقط ارتباط با پنل. چون این پیام‌ها کاملاً
-        # مستقل از هم‌اند، حالا همزمان (concurrent) اجرا می‌شوند تا زمانشان روی هم جمع نشود.
-        send_result, log_result = await asyncio.gather(
-            _send_to_customer(),
-            _log_fulfilled_order(
-                bot, user,
-                plan_order_id=order_id if order_kind == "plan" else None,
-                custom_order_id=order_id if order_kind == "custom" else None,
-                service_id=slug, service_name=name,
-                package_text=f"{volume_text} | {days_text}", expiry_text=expiry_date or "نامحدود",
-            ),
-            return_exceptions=True,
+            return sent.photo[-1].file_id if sent.photo else None
+        await bot.send_message(
+            int(uid), caption, reply_markup=config_delivery_keyboard(bot_info.get('connection_guide_url'))
         )
+        return None
 
-        if isinstance(send_result, Exception):
-            logger.exception("ارسال کانفیگ به کاربر ناموفق بود", exc_info=send_result)
-            await bot.send_message(ADMIN_ID, f"⚠️ سرویس ساخته و ذخیره شد ولی ارسال پیام به کاربر ناموفق بود: {send_result}")
-        else:
-            if send_result:
-                db.set_config_qr(config_id, send_result)
-            await bot.send_message(ADMIN_ID, "✅ سرویس به‌صورت خودکار ساخته و برای کاربر ارسال شد.")
+    # 🆕 فیکس سرعت: قبلاً ارسال کانفیگ به مشتری، پیام تأیید به ادمین، و ثبت لاگ سفارش در کانال
+    # «اعتماد» (که خودش شامل یک get_chat + یک send_message جداست) کاملاً پشت‌سرهم ارسال می‌شدند؛ همین زنجیره‌ی رفت‌وبرگشت‌های متوالی، اصلی‌ترین عامل کند بودن
+    # (۱۰-۱۵ ثانیه) کل فرآیند «ساخت و ارسال سرویس» بود، نه فقط ارتباط با پنل. چون این پیام‌ها کاملاً
+    # مستقل از هم‌اند، حالا همزمان (concurrent) اجرا می‌شوند تا زمانشان روی هم جمع نشود.
+    send_result, log_result = await asyncio.gather(
+        _send_to_customer(),
+        _log_fulfilled_order(
+            bot, user,
+            plan_order_id=order_id if order_kind == "plan" else None,
+            custom_order_id=order_id if order_kind == "custom" else None,
+            service_id=slug, service_name=name,
+            package_text=f"{volume_text} | {days_text}", expiry_text=expiry_date or "نامحدود",
+        ),
+        return_exceptions=True,
+    )
 
-        if isinstance(log_result, Exception):
-            logger.exception("ثبت لاگ سفارش در کانال اعتماد ناموفق بود", exc_info=log_result)
-    except Exception as exc:
-        # 🐛 فیکس: این استثنا قبلاً کاملاً بی‌صدا گم می‌شد. حالا حداقل یک پیام خطای
-        # دقیق (با نوع و متن خطا) به ادمین می‌رسد، به‌همراه خود لینک ساخته‌شده در پنل
-        # تا سرویسی که واقعاً در پنل ساخته شده گم نشود و بشه دستی هم ارسالش کرد.
-        logger.exception("خطای غیرمنتظره در _deliver_marzban_link")
-        try:
-            await bot.send_message(
-                ADMIN_ID,
-                "❌ سرویس در پنل ساخته شد ولی هنگام ذخیره/ارسال آن خطای غیرمنتظره‌ای رخ داد:\n"
-                f"<code>{html.escape(f'{type(exc).__name__}: {exc}')}</code>\n\n"
-                f"🔗 لینک ساخته‌شده (برای ارسال دستی):\n<code>{html.escape(str(link))}</code>",
-                parse_mode="HTML",
-            )
-        except Exception:
-            logger.exception("حتی ارسال پیام خطای این بخش هم ناموفق بود")
+    if isinstance(send_result, Exception):
+        logger.exception("ارسال کانفیگ به کاربر ناموفق بود", exc_info=send_result)
+        await bot.send_message(ADMIN_ID, f"⚠️ سرویس ساخته و ذخیره شد ولی ارسال پیام به کاربر ناموفق بود: {send_result}")
+    else:
+        if send_result:
+            db.set_config_qr(config_id, send_result)
+        await bot.send_message(ADMIN_ID, "✅ سرویس به‌صورت خودکار ساخته و برای کاربر ارسال شد.")
+
+    if isinstance(log_result, Exception):
+        logger.exception("ثبت لاگ سفارش در کانال اعتماد ناموفق بود", exc_info=log_result)
 
 
 # ---------------------------------------------------------------------------
