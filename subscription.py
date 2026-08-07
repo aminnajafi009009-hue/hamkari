@@ -189,17 +189,35 @@ async def extract_meta(sub_url: str, _depth: int = 0, _retry: int = 0) -> dict |
         return None
 
 
+def _b64_decode_any(text: str) -> str | None:
+    """🆕 فیکس: بعضی پنل‌ها (مثل همینی که توکنش در URL از حروف - و _ استفاده می‌کند)
+    بدنه‌ی ساب را با base64 نوع URL-safe برمی‌گردانند، نه base64 استاندارد.
+    base64.b64decode استاندارد به‌جای خطا دادن روی کاراکترهای - و _، آن‌ها را
+    بی‌سروصدا حذف می‌کند و کل رشته را خراب می‌کند؛ در نتیجه هیچ vmess://‎ یا
+    vless://‎ ای در متن دیکودشده پیدا نمی‌شد (باگ گزارش‌شده: «لینک ساب باز شد
+    ولی هیچ کانفیگ تکی پیدا نشد» برای همه‌ی سرویس‌های فعال). این تابع هر دو
+    نوع base64 (استاندارد و URL-safe) را امتحان می‌کند."""
+    if not text:
+        return None
+    padded = text + "=" * (-len(text) % 4)
+    for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+        try:
+            decoded = decoder(padded).decode("utf-8", errors="ignore")
+        except Exception:
+            continue
+        if decoded and any(s in decoded for s in _CONFIG_SCHEMES):
+            return decoded
+    return None
+
+
 def _parse_configs(body: str) -> list[str]:
-    """بدنه‌ی خام لینک ساب (معمولاً base64) را به لیست کانفیگ‌های تکی تبدیل می‌کند."""
+    """بدنه‌ی خام لینک ساب (معمولاً base64 استاندارد یا URL-safe) را به لیست کانفیگ‌های تکی تبدیل می‌کند."""
     if not body:
         return []
     text = body.strip()
-    try:
-        decoded = base64.b64decode(text + "=" * (-len(text) % 4)).decode("utf-8", errors="ignore")
-    except Exception:
-        decoded = None
+    decoded = _b64_decode_any(text)
 
-    candidate = decoded if decoded and any(s in decoded for s in _CONFIG_SCHEMES) else text
+    candidate = decoded if decoded else text
     lines = [ln.strip() for ln in candidate.splitlines() if ln.strip()]
     return [ln for ln in lines if ln.startswith(_CONFIG_SCHEMES)]
 
