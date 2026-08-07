@@ -238,7 +238,7 @@ def custom_build_payment_keyboard():
     ]
     if UNIQUEPAY_ENABLED:
         buttons.append(
-            [InlineKeyboardButton(text="🌐 پرداخت آنلاین (تایید خودکا��)", callback_data="cbuild_pay_online", style="success")]
+            [InlineKeyboardButton(text="🌐 پرداخت آنلاین (تایید خودکار)", callback_data="cbuild_pay_online", style="success")]
         )
     buttons.append([InlineKeyboardButton(text="💳 پرداخت کارت به کارت", callback_data="cbuild_pay_card", style="success")])
     buttons.append([InlineKeyboardButton(text="🔙 انصراف", callback_data="plans", style="danger")])
@@ -729,7 +729,7 @@ def admin_pending_receipts_keyboard(receipts, custom_receipts):
     buttons = []
     for r in receipts:
         # 🐛 فیکس: r["id"] (شناسه‌ی خود ردیف pending_receipts) را هم در callback_data می‌فرستیم تا در
-        # صف رسیدهای در انتظار هم که کاربر/مبلغشان یکسان است، قفل ضدتکرار با هم تداخل نکن��.
+        # صف رسیدهای در انتظار هم که کاربر/مبلغشان یکسان است، قفل ضدتکرار با هم تداخل نکند.
         if r["kind"] == "charge":
             label = f"💰 شارژ {r['amount']:,} ت — {r['telegram_id']}"
             buttons.append([
